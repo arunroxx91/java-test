@@ -14,7 +14,7 @@ HTTP request with a json payload.
     - _The actual sending of the http request should not actually fire as it will have nowhere to go, so have the 
     application output `"Data Sync Success"` followed by the http request payload instead of actually firing off the request.
     Don't worry about the url or server's response, assume it will either respond with a 204 or 500 status code._
-    - It is still expected to code everything except the final 
+    - It is still expected to code everything except the actual sending of the request. 
 
 - Additionally write findings as json file to a /code/results.json file (within the Docker container/runtime env itself). 
 
@@ -25,14 +25,6 @@ The application:
 - *accurately* assesses which readings trigger which rules
 - logs/outputs the http request payload of the data sync
 - produces a json file
-
-## What HRS is looking for
-
-Beside the above acceptance criteria HRS is looking for implementations of the concepts:
-- Encapsulation
-- Polymorphism
-- Dependency Injection
-- *Overall OOP best practices  
 
 ## System Requirements
 
