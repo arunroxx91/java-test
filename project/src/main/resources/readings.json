@@ -96,7 +96,7 @@
   },
   {
     "id": 6,
-    "reading\ns": [
+    "readings": [
       {
         "type": "bloodPressure",
         "systolic": 111,
@@ -142,7 +142,7 @@
         "heartRate": 122
       },
       {
-        "type": "glucos\ne",
+        "type": "glucose",
         "bloodSugarLevel": 190
       },
       {
@@ -193,7 +193,7 @@
     "id": 11,
     "readings": [
       {
-        "type": "\nbloodPressure",
+        "type": "bloodPressure",
         "systolic": 149,
         "diastolic": 110,
         "heartRate": 140
@@ -238,7 +238,7 @@
       },
       {
         "type": "glucose",
-        "bloodS\nugarLevel": 104
+        "bloodSugarLevel": 104
       },
       {
         "type": "weight",
