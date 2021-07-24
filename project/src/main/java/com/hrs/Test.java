@@ -21,39 +21,49 @@ public class Test {
     Logger log = LogManager.getFormatterLogger();
 
     public static void main(String[] args) throws Exception {
-        //String readingsFile = args.length >= 1 ? args[0] : null;
-        //String rulesFiles = args.length >= 2 ? args[1] : "rules.json";
-        String readingsFile=readFileAsString("src/main/resources/readings.json");
-        String rulesFiles=readFileAsString("src/main/resources/rules.json");
+        String readingsFile=readFileAsString(args.length >= 1 ? args[0] : null);
+        String rulesFiles=readFileAsString(args.length >= 2 ? args[1] : "rules.json");
+       // String readingsFile=readFileAsString("src/main/resources/readings.json");
+        //String rulesFiles=readFileAsString("src/main/resources/rules.json");
         new Test(rulesFiles, readingsFile);
         Thread.sleep(5);
     }
 
-    public Test(String rulesFile, String readingsFile) throws FileNotFoundException {
+    public Test(String rulesFile, String readingsFile) throws Exception {
         Type type = new Gson().fromJson(rulesFile, Type.class);
         Readings[] readings  = new Gson().fromJson(readingsFile, Readings[].class);
         List<Response> responce =valueProcessing(Arrays.asList(readings),type);
-        InputStream inputStream = new FileInputStream(new File("src/main/resources/readings.yml"));
+       /* InputStream inputStream = new FileInputStream(new File("src/main/resources/readings.yml"));
         Yaml yaml = new Yaml();
         Map<String, Object> data = yaml.load(inputStream);
         Gson gson = new Gson();
         JsonElement jsonElement = gson.toJsonTree(data);
         Readings pojo = gson.fromJson(jsonElement, Readings.class);
         List<Response> responce1 =valueProcessing(Arrays.asList(pojo),type);
-        System.out.println("99999999999999999999"+responce1);
-        /*InputStream inputStream = new FileInputStream(new File("src/main/resources/readings.yml"));
+        System.out.println("99999999999999999999"+responce1);*//*
+        *//*InputStream inputStream = new FileInputStream(new File("src/main/resources/readings.yml"));
         Yaml yaml = new Yaml(new Constructor(Readings[].class));
-        Readings[] data = yaml.load(inputStream);*/
-        System.out.println(data);
-        log.debug(responce);
+        Readings[] data = yaml.load(inputStream);*//*
+        System.out.println(data);*/
         String json = new Gson().toJson(responce);
-        System.out.println("*************************"+json);
         // Read resource source file for rules
         // Read resource source file for values
         // See which values trigger the rules
         // Report the findings to another server
         //     (don't need to make the actual http request but code should lead up until that final moment)
+        HttpClinet httpClinet = new HttpClinet();
+        String outPut=httpClinet.sendPOST(json);
+        log.info(outPut);
         // Write findings as json file to /code/results.json
+        //Write JSON file
+        try (FileWriter file = new FileWriter("results.json")) {
+            //We can write any JSONArray or JSONObject instance to the file
+            file.write(json);
+            file.flush();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private static String readFileAsString(String file)throws Exception
@@ -63,7 +73,6 @@ public class Test {
 
 
     private List<Response> valueProcessing(List<Readings> readingsList, Type rule){
-        List<Readings> processedList = new ArrayList<>();
         List<Response> responseList = new ArrayList<>();
         for (Readings readingVal:readingsList) {
             for(ReadingType readingType:readingVal.getReadings()) {
