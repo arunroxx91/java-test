@@ -1,175 +1,218 @@
 package com.hrs;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
-import com.google.gson.JsonElement;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.Constructor;
-
-import java.io.*;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.modelmapper.ModelMapper;
+import org.modelmapper.convention.MatchingStrategies;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.gson.Gson;
 
 public class Test {
     Logger log = LogManager.getFormatterLogger();
 
+
     public static void main(String[] args) throws Exception {
-        String readingsFile=readFileAsString(args.length >= 1 ? args[0] : null);
-        String rulesFiles=readFileAsString(args.length >= 2 ? args[1] : "rules.json");
-       // String readingsFile=readFileAsString("src/main/resources/readings.json");
-        //String rulesFiles=readFileAsString("src/main/resources/rules.json");
+        String readingsFile=(args.length >= 1 ? args[0] : null);
+        String rulesFiles=(args.length >= 2 ? args[1] : "rules.json");
         new Test(rulesFiles, readingsFile);
         Thread.sleep(5);
     }
 
-    public Test(String rulesFile, String readingsFile) throws Exception {
-        Type type = new Gson().fromJson(rulesFile, Type.class);
-        Readings[] readings  = new Gson().fromJson(readingsFile, Readings[].class);
-        List<Response> responce =valueProcessing(Arrays.asList(readings),type);
-       /* InputStream inputStream = new FileInputStream(new File("src/main/resources/readings.yml"));
-        Yaml yaml = new Yaml();
-        Map<String, Object> data = yaml.load(inputStream);
-        Gson gson = new Gson();
-        JsonElement jsonElement = gson.toJsonTree(data);
-        Readings pojo = gson.fromJson(jsonElement, Readings.class);
-        List<Response> responce1 =valueProcessing(Arrays.asList(pojo),type);
-        System.out.println("99999999999999999999"+responce1);*//*
-        *//*InputStream inputStream = new FileInputStream(new File("src/main/resources/readings.yml"));
-        Yaml yaml = new Yaml(new Constructor(Readings[].class));
-        Readings[] data = yaml.load(inputStream);*//*
-        System.out.println(data);*/
-        String json = new Gson().toJson(responce);
-        // Read resource source file for rules
-        // Read resource source file for values
-        // See which values trigger the rules
-        // Report the findings to another server
-        //     (don't need to make the actual http request but code should lead up until that final moment)
-        HttpClinet httpClinet = new HttpClinet();
-        String outPut=httpClinet.sendPOST(json);
-        log.info(outPut);
-        // Write findings as json file to /code/results.json
-        //Write JSON file
-        try (FileWriter file = new FileWriter("results.json")) {
-            //We can write any JSONArray or JSONObject instance to the file
-            file.write(json);
-            file.flush();
 
-        } catch (IOException e) {
-            e.printStackTrace();
+
+    public Test(String rulesFile, String readingsFile) throws Exception {
+        try {
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+            ModelMapper modelMapper = new ModelMapper();
+            modelMapper.getConfiguration().setMatchingStrategy(MatchingStrategies.LOOSE);
+
+            RuleReading rule = mapper.readValue(new File(rulesFile), RuleReading.class);
+
+            // json file readings
+            List<Reading> finalReadingList = new ArrayList<>();
+            if(readingsFile.contains(".json")) {
+                getJsonReadings(readingsFile);
+            }
+            else if(readingsFile.contains(".yml")|| readingsFile.contains(".yaml")) {
+                // yaml file readings
+                YamlFileReadings(readingsFile, mapper, modelMapper, finalReadingList);
+            }
+            List<Response> response = valueProcessing(finalReadingList, rule);
+            String json = new Gson().toJson(response);
+            HttpClinet httpClinet = new HttpClinet();
+            String outPut=httpClinet.sendPOST(json);
+            log.info(outPut);
+            try (FileWriter file = new FileWriter("results.json")) {
+                //We can write any JSONArray or JSONObject instance to the file
+                file.write(json);
+                file.flush();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } catch (Exception e1) {
+            e1.printStackTrace();
+        }
+
+    }
+
+    private void YamlFileReadings(String readingsFile, ObjectMapper mapper, ModelMapper modelMapper, List<Reading> finalReadingList) throws java.io.IOException {
+        Map<String, YamlReadings> yamlReadings = mapper.readValue(new File(readingsFile),
+                Map.class);
+
+        for (Entry<String, YamlReadings> entry : yamlReadings.entrySet()) {
+            YamlReadings value = mapper.convertValue(entry.getValue(), new TypeReference<YamlReadings>() {
+            });
+            Reading reading = new Reading();
+            reading = modelMapper.map(value, Reading.class);
+            reading.setId(entry.getKey());
+            finalReadingList.add(reading);
         }
     }
 
-    private static String readFileAsString(String file)throws Exception
-    {
+    private List<Reading> getJsonReadings(String readingsFile) throws Exception {
+        String readingsFileResult = readFileAsString(readingsFile);
+        JsonReading[] jsonReadings = new Gson().fromJson(readingsFileResult, JsonReading[].class);
+        List<JsonReading> jsonReadingList = Arrays.asList(jsonReadings);
+
+        List<Reading> finalReadingList = new ArrayList<Reading>();
+
+        for (JsonReading rd : jsonReadingList) {
+            Reading readings = new Reading();
+            readings.setId(rd.getId());
+            AtomicReference<String> bloodSugarLevel = new AtomicReference<>();
+            AtomicReference<String> diastolic = new AtomicReference<>();
+            AtomicReference<String> heartRate = new AtomicReference<>();
+            AtomicReference<String> systolic = new AtomicReference<>();
+            AtomicReference<String> weight = new AtomicReference<>();
+            rd.getReadings().forEach(r -> {
+                bloodSugarLevel
+                        .set(r.getBloodSugarLevel() != null ? r.getBloodSugarLevel() : bloodSugarLevel.get());
+                diastolic.set(r.getDiastolic() != null ? r.getDiastolic() : diastolic.get());
+                heartRate.set(r.getHeartRate() != null ? r.getHeartRate() : heartRate.get());
+                systolic.set(r.getSystolic() != null ? r.getSystolic() : systolic.get());
+                weight.set(r.getWeight() != null ? r.getWeight() : weight.get());
+            });
+            readings.setBloodSugarLevel(bloodSugarLevel.get());
+            readings.setDiastolic(diastolic.get());
+            readings.setHeartRate(heartRate.get());
+            readings.setSystolic(systolic.get());
+            readings.setWeight(weight.get());
+            finalReadingList.add(readings);
+        }
+        return finalReadingList;
+    }
+
+    private static String readFileAsString(String file) throws Exception {
         return new String(Files.readAllBytes(Paths.get(file)));
     }
 
-
-    private List<Response> valueProcessing(List<Readings> readingsList, Type rule){
+    private static List<Response> valueProcessing(List<Reading> readingList,RuleReading rule) {
         List<Response> responseList = new ArrayList<>();
-        for (Readings readingVal:readingsList) {
-            for(ReadingType readingType:readingVal.getReadings()) {
-                Response response = new Response();
-                Readings readingResult = new Readings();
-                ReadingType readingTypeResult = new ReadingType();
-                if (readingType.getType().equalsIgnoreCase("bloodPressure")) {
-                    if (ruleValidation(rule.getBloodPressure().getSystolic()[0], rule.getBloodPressure().getSystolic()[1], readingType.getSystolic())) {
-                        response= setReadingValue(readingVal.getId(), readingType.getType());
-                        response.setSubTypeValue(readingType.getSystolic());
-                        response.setSubType("systolic");
-                        responseList.add(response);
-                    }
-                    if (ruleValidation(rule.getBloodPressure().getDiastolic()[0], rule.getBloodPressure().getDiastolic()[1], readingType.getDiastolic())) {
-                        response=setReadingValue(readingVal.getId(), readingType.getType());
-                        response.setSubTypeValue(readingType.getDiastolic());
-                        response.setSubType("diastolic");
-                        responseList.add(response);
-                    }
-                    if (ruleValidation(rule.getBloodPressure().getHeartRate()[0], rule.getBloodPressure().getHeartRate()[1], readingType.getHeartRate())) {
-                        response=setReadingValue(readingVal.getId(), readingType.getType());
-                        response.setSubTypeValue(readingType.getHeartRate());
-                        response.setSubType("heartRate");
-                        responseList.add(response);
-                    }
 
-                } else if (readingType.getType().equalsIgnoreCase("glucose") &&
-                        ruleValidation(rule.getGlucose().getBloodSugarLevel()[0], rule.getGlucose().getBloodSugarLevel()[1],
-                                readingType.getBloodSugarLevel())) {
-                    response= setReadingValue(readingVal.getId(), readingType.getType());
-                    response.setSubTypeValue(readingType.getBloodSugarLevel());
-                    response.setSubType("bloodSugarLevel");
-                    responseList.add(response);
+        List<String> sysrule = rule.getBloodPressure().getSystolic();
+        String sysOper = sysrule.get(0);
+        String sysValue = sysrule.get(1);
 
-                } else if (readingType.getType().equalsIgnoreCase("weight") &&
-                        ruleValidation(rule.getWeight().getWeight()[0],
-                                rule.getWeight().getWeight()[1], readingType.getWeight())) {
-                    response= setReadingValue(readingVal.getId(), readingType.getType());
-                    response.setSubTypeValue(readingType.getWeight());
-                    response.setSubType("weight");
-                    responseList.add(response);
-                }
+        List<String> diarule = rule.getBloodPressure().getDiastolic();
+        String diaOper = diarule.get(0);
+        String diaValue = diarule.get(1);
+
+        List<String> heartrule = rule.getBloodPressure().getHeartRate();
+        String heartOper = heartrule.get(0);
+        String heartValue = heartrule.get(1);
+
+        List<String> sugarrule = rule.getGlucose().getBloodSugarLevel();
+        String sugarOper = sugarrule.get(0);
+        String sugarValue = sugarrule.get(1);
+
+        List<String> weightrule = rule.getWeight().getWeight();
+        String weightOper = weightrule.get(0);
+        String weightValue = weightrule.get(1);
+
+        for (Reading readingVal : readingList) {
+
+            if (readingVal.getSystolic() != null && ruleValidation(sysOper, sysValue, readingVal.getSystolic())) {
+                responseList.add(
+                        setReadingValue(readingVal.getId(), "bloodPressure", "systolic", readingVal.getSystolic()));
+            }
+            if (readingVal.getDiastolic() != null && ruleValidation(diaOper, diaValue, readingVal.getDiastolic())) {
+                responseList.add(
+                        setReadingValue(readingVal.getId(), "bloodPressure", "diastolic", readingVal.getDiastolic()));
+            }
+            if (readingVal.getHeartRate() != null && ruleValidation(heartOper, heartValue, readingVal.getHeartRate())) {
+                responseList.add(
+                        setReadingValue(readingVal.getId(), "bloodPressure", "heartRate", readingVal.getHeartRate()));
+            }
+            if (readingVal.getBloodSugarLevel() != null
+                    && ruleValidation(sugarOper, sugarValue, readingVal.getBloodSugarLevel())) {
+                responseList.add(setReadingValue(readingVal.getId(), "glucose", "bloodSugarLevel",
+                        readingVal.getBloodSugarLevel()));
+            }
+            if (readingVal.getWeight() != null && ruleValidation(weightOper, weightValue, readingVal.getWeight())) {
+                responseList.add(setReadingValue(readingVal.getId(), "weight", "weight", readingVal.getWeight()));
             }
 
         }
 
-        return responseList ;
+        return responseList;
     }
 
-    private  Response setReadingValue(int id, String type){
-        Response readingResult= new Response();
-        readingResult.setId(id);
+    private static Response setReadingValue(String id, String type, String subType,
+                                                                               String value) {
+        Response readingResult = new Response();
+        readingResult.setId(Integer.valueOf(id));
+        readingResult.setSubTypeValue(value);
+        readingResult.setSubType(subType);
         readingResult.setType(type);
         return readingResult;
     }
 
-
-    private boolean ruleValidation(String operation,String ruleValue,String readingValue){
+    private static boolean ruleValidation(String operation, String ruleValue, String readingValue) {
         Integer ruleInt = Integer.valueOf(ruleValue);
         Integer readingInt = Integer.valueOf(readingValue);
-        switch (operation){
-            case "<":
-            {
-                if(readingInt<ruleInt)
-                {
+        switch (operation) {
+            case "<": {
+                if (readingInt < ruleInt) {
                     return true;
                 }
                 break;
             }
-            case ">":
-            {
-                if(readingInt>ruleInt)
-                {
+            case ">": {
+                if (readingInt > ruleInt) {
                     return true;
                 }
                 break;
             }
-            case "=":
-            {
-                if(readingInt==ruleInt)
-                {
+            case "=": {
+                if (readingInt == ruleInt) {
                     return true;
                 }
                 break;
             }
-            case ">=":
-            {
-                if(readingInt>=ruleInt)
-                {
+            case ">=": {
+                if (readingInt >= ruleInt) {
                     return true;
                 }
                 break;
             }
-            case "<=":
-            {
-                if(readingInt<=ruleInt)
-                {
+            case "<=": {
+                if (readingInt <= ruleInt) {
                     return true;
                 }
                 break;
@@ -178,7 +221,7 @@ public class Test {
                 return false;
 
         }
-return false;
+        return false;
     }
 
 }
