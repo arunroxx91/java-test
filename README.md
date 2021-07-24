@@ -21,7 +21,7 @@ HTTP request with a json payload.
 ## Acceptance Criteria
 
 The application:
-- can be ran via `java -jar /path/to/file.jar readings.json` or `java -jar /path/to/file.jar readings.yml` (see below for Docker based instructions)
+- can be ran via `java -jar target/test-1.0.jar src\main\resources\readings.json src\main\resources\rules.json` or `java -jar /path/to/file.jar readings.yml` (see below for Docker based instructions)
 - *accurately* assesses which readings trigger which rules
 - logs/outputs the http request payload of the data sync
 - produces a json file
