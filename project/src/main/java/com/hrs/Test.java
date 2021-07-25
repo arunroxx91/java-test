@@ -27,12 +27,11 @@ public class Test {
 
 
     public static void main(String[] args) throws Exception {
-        String readingsFile=(args.length >= 1 ? args[0] : null);
-        String rulesFiles=(args.length >= 2 ? args[1] : "rules.json");
+        String readingsFile = (args.length >= 1 ? args[0] : null);
+        String rulesFiles = (args.length >= 2 ? args[1] : "rules.json");
         new Test(rulesFiles, readingsFile);
         Thread.sleep(5);
     }
-
 
 
     public Test(String rulesFile, String readingsFile) throws Exception {
@@ -45,17 +44,16 @@ public class Test {
 
             // json file readings
             List<Reading> finalReadingList = new ArrayList<>();
-            if(readingsFile.contains(".json")) {
+            if (readingsFile.contains(".json")) {
                 getJsonReadings(readingsFile);
-            }
-            else if(readingsFile.contains(".yml")|| readingsFile.contains(".yaml")) {
+            } else if (readingsFile.contains(".yml") || readingsFile.contains(".yaml")) {
                 // yaml file readings
                 YamlFileReadings(readingsFile, mapper, modelMapper, finalReadingList);
             }
             List<Response> response = valueProcessing(finalReadingList, rule);
             String json = new Gson().toJson(response);
             HttpClinet httpClinet = new HttpClinet();
-            String outPut=httpClinet.sendPOST(json);
+            String outPut = httpClinet.sendPOST(json);
             log.info(outPut);
             try (FileWriter file = new FileWriter("results.json")) {
                 //We can write any JSONArray or JSONObject instance to the file
@@ -122,7 +120,7 @@ public class Test {
         return new String(Files.readAllBytes(Paths.get(file)));
     }
 
-    private static List<Response> valueProcessing(List<Reading> readingList,RuleReading rule) {
+    private static List<Response> valueProcessing(List<Reading> readingList, RuleReading rule) {
         List<Response> responseList = new ArrayList<>();
 
         List<String> sysrule = rule.getBloodPressure().getSystolic();
@@ -174,7 +172,7 @@ public class Test {
     }
 
     private static Response setReadingValue(String id, String type, String subType,
-                                                                               String value) {
+                                            String value) {
         Response readingResult = new Response();
         readingResult.setId(Integer.valueOf(id));
         readingResult.setSubTypeValue(value);
